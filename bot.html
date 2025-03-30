@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant Bot</title>
+    <link rel="stylesheet" href="bot.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>AI Assistant Bot</h1>
+            <p>Your intelligent virtual assistant</p>
+        </div>
+        <div id="auth-section">
+            <input type="text" id="username-input" placeholder="Enter your name">
+            <button id="login-button">Start Chatting</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="bot-info">
+                    <img src="bot.jpg" alt="Bot Avatar">
+                    <h2>AI Assistant</h2>
+                </div>
+                <select id="personality-selector">
+                    <option value="assistant">Assistant</option>
+                    <option value="comedian">Comedian</option>
+                    <option value="professor">Professor</option>
+                </select>
+            </div>
+            
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages will appear here -->
+            </div>
+            
+            <div class="chat-input">
+                <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off">
+                <button id="send-button">Send</button>
+                <button id="voice-button">🎤</button>
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature-card">
+                <h3>24/7 Availability</h3>
+                <p>Our AI assistant is always ready to help you, day or night.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Instant Responses</h3>
+                <p>Get immediate answers to your questions without waiting.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Multiple Languages</h3>
+                <p>Communicate in your preferred language for better understanding.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2023 AI Assistant Bot. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const voiceButton = document.getElementById('voice-button');
+        const loginButton = document.getElementById('login-button');
+        const usernameInput = document.getElementById('username-input');
+        const personalitySelector = document.getElementById('personality-selector');
+        
+        // Bot configuration
+        let currentUser = null;
+        let conversationHistory = JSON.parse(localStorage.getItem('conversation')) || [];
+        let analytics = JSON.parse(localStorage.getItem('analytics')) || {
+            messagesSent: 0,
+            messagesReceived: 0,
+            firstUse: new Date().toISOString()
+        };
+        
+        const personalities = {
+            assistant: {
+                system: "You are a helpful assistant.",
+                greeting: "Hello! How can I help you today?"
+            },
+            comedian: {
+                system: "You are a stand-up comedian. Make jokes and be funny.",
+                greeting: "Why did the chatbot cross the road? To get to the other website! How can I entertain you?"
+            },
+            professor: {
+                system: "You are a university professor. Be academic and precise.",
+                greeting: "Greetings. I am prepared to engage in scholarly discourse. What topic shall we explore?"
+            }
+        };
+        
+        // Initialize the chat
+        function initChat() {
+            const personality = personalitySelector.value;
+            addMessage(personalities[personality].greeting);
+            
+            // Load previous conversation
+            conversationHistory.forEach(msg => {
+                addMessage(msg.text, msg.isUser, false);
+            });
+        }
+        
+        // Add message to chat
+        function addMessage(text, isUser = false, saveToHistory = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
+            
+            // Format message content
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            let formattedText = text.replace(urlRegex, url => {
+                if (url.match(/\.(jpeg|jpg|gif|png)$/)) {
+                    return `<img src="${url}" style="max-width:100%; border-radius:8px; margin-top:0.5rem;">`;
+                } else {
+                    return `<a href="${url}" target="_blank">${url}</a>`;
+                }
+            });
+            
+            // Add username if it's a user message
+            if (isUser && currentUser) {
+                formattedText = `<strong>${currentUser}:</strong> ${formattedText}`;
+            }
+            
+            messageDiv.innerHTML = formattedText;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Speak bot messages
+            if (!isUser && 'speechSynthesis' in window) {
+                speak(text);
+            }
+            
+            // Store message in history
+            if (saveToHistory) {
+                conversationHistory.push({
+                    text,
+                    isUser,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Keep only last 50 messages
+                if (conversationHistory.length > 50) {
+                    conversationHistory = conversationHistory.slice(-50);
+                }
+                
+                localStorage.setItem('conversation', JSON.stringify(conversationHistory));
+            }
+            
+            // Update analytics
+            updateAnalytics(isUser);
+        }
+        
+        // Update analytics
+        function updateAnalytics(isUserMessage) {
+            if (isUserMessage) {
+                analytics.messagesSent++;
+            } else {
+                analytics.messagesReceived++;
+            }
+            localStorage.setItem('analytics', JSON.stringify(analytics));
+        }
+        
+        // Show typing indicator
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.classList.add('typing-indicator');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Hide typing indicator
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+        
+        // Speech synthesis
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Process user input
+        function processUserInput() {
+            const text = userInput.value.trim();
+            if (text === '') return;
+            
+            addMessage(text, true);
+            userInput.value = '';
+            showTypingIndicator();
+            
+            // Simulate bot response
+            setTimeout(() => {
+                hideTypingIndicator();
+                generateBotResponse(text);
+            }, 1000 + Math.random() * 2000);
+        }
+        
+        // Generate bot response
+        function generateBotResponse(userInput) {
+            const personality = personalitySelector.value;
+            const lowerInput = userInput.toLowerCase();
+            
+            // Common responses
+            const commonResponses = {
+                "hello": `Hello${currentUser ? ' ' + currentUser : ''}! How can I help you today?`,
+                "hi": `Hi there${currentUser ? ' ' + currentUser : ''}! What can I do for you?`,
+                "what can you do": "I can answer questions, have conversations, tell jokes (in comedian mode), and provide information. Try asking me anything!",
+                "how are you": "I'm just a computer program, but I'm functioning well. How about you?",
+                "thank you": "You're welcome! Is there anything else I can help with?",
+                "goodbye": `Goodbye${currentUser ? ' ' + currentUser : ''}! Feel free to come back if you have more questions.`
+            };
+            
+            // Personality-specific responses
+            let response;
+            
+            if (commonResponses[lowerInput]) {
+                response = commonResponses[lowerInput];
+            } else if (personality === 'comedian') {
+                const jokes = [
+                    "Why don't scientists trust atoms? Because they make up everything!",
+                    "Did you hear about the mathematician who's afraid of negative numbers? He'll stop at nothing to avoid them!",
+                    "Why did the scarecrow win an award? Because he was outstanding in his field!"
+                ];
+                response = jokes[Math.floor(Math.random() * jokes.length)];
+            } else if (personality === 'professor') {
+                response = "That's an interesting query. From an academic perspective, we might consider several factors in our analysis...";
+            } else {
+                const genericResponses = [
+                    "I understand you're asking about " + userInput + ". Can you tell me more about what you're looking for?",
+                    "That's an interesting question. Let me think about how best to respond...",
+                    "I'm designed to help with a variety of topics. What specifically would you like to know about " + userInput + "?",
+                    "I'm constantly learning to provide better answers. Could you rephrase your question?"
+                ];
+                response = genericResponses[Math.floor(Math.random() * genericResponses.length)];
+            }
+            
+            addMessage(response);
+        }
+        
+        // Voice recognition
+        function setupVoiceRecognition() {
+            voiceButton.addEventListener('click', () => {
+                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                    addMessage("Your browser doesn't support speech recognition. Try Chrome or Edge.");
+                    return;
+                }
+                
+                const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = 'en-US';
+                
+                recognition.onresult = (event) => {
+                    const speechResult = event.results[0][0].transcript;
+                    userInput.value = speechResult;
+                    processUserInput();
+                };
+                
+                recognition.onerror = (event) => {
+                    addMessage("There was an error with voice recognition: " + event.error);
+                };
+                
+                recognition.start();
+                voiceButton.textContent = '🔴 Listening...';
+                recognition.onspeechend = () => {
+                    voiceButton.textContent = '🎤';
+                };
+            });
+        }
+        
+        // Event Listeners
+        sendButton.addEventListener('click', processUserInput);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                processUserInput();
+            }
+        });
+        
+        loginButton.addEventListener('click', () => {
+            const username = usernameInput.value.trim();
+            if (username) {
+                currentUser = username;
+                document.getElementById('auth-section').style.display = 'none';
+                initChat();
+            }
+        });
+        
+        personalitySelector.addEventListener('change', (e) => {
+            const personality = e.target.value;
+            chatMessages.innerHTML = '';
+            addMessage(personalities[personality].greeting);
+        });
+        
+        // Initialize
+        setupVoiceRecognition();
+    </script>
+</body>
+</html>
